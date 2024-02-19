@@ -52,9 +52,13 @@ const loginUser = async (req, res, next) => {
         }
         const newEmail = email.toLowerCase();
 
-        const user = await User.findById({ email: newEmail })
+        const user = await User.findOne({ email: newEmail })
         if (!user) {
             return next(new HttpError("Invalid credentials.", 422))
+        }
+
+        if (!user.password) {
+            return next(new HttpError("User password is not set.", 500)); // Adjust the error response as needed
         }
 
         const comparePass = await bcrypt.compare(password, user.password)
