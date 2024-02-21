@@ -97,41 +97,52 @@ const getUser = async (req, res, next) => {
 const changeAvatar = async (req, res, next) => {
     try {
         if (!req.files.avatar) {
-            return next(new HttpError("Please choose an image", 422))
+            return next(new HttpError("Please choose an image", 422));
         }
 
-        const user = await User.findById(req.user.id)
+        const user = await User.findById(req.user.id);
 
-        if (user.avatar) {
+        if (user?.avatar) {
             fs.unlink(path.join(__dirname, "..", "uploads", user.avatar), (err) => {
                 if (err) {
-                    return next(new HttpError(err))
+                    return next(new HttpError(err));
                 }
-            })
+            });
         }
 
         const { avatar } = req.files;
-        //check file size
+
+        // Check file size
         if (avatar.size > 500000) {
-            return next(new HttpError("Profile picture too big, Should be less than 500kb", 422))
+            return next(new HttpError("Profile picture too big, should be less than 500kb", 422));
         }
 
-        let fileName;
-        fileName = avatar.name
-        let splittedFilename = fileName.split('.')
-        let newFileName = splittedFilename[0] + uuid() + '.' + splittedFilename[splittedFilename.length - 1]
+        let fileName = avatar.name;
+        let splittedFilename = fileName.split('.');
+        let newFileName = splittedFilename[0] + uuid() + '.' + splittedFilename[splittedFilename.length - 1];
+
         avatar.mv(path.join(__dirname, '..', '/uploads', newFileName), async (err) => {
             if (err) {
-                return next(new HttpError(err))
+                return next(new HttpError(err));
             }
 
-            const updatedAvatar = await User.findByIdAndDelete(req.user.id, { avater: newFileName }, { new: true })
-            if (!updatedAvatar) {
-                return next(new HttpError("Avatar could't be changed", 422))
+            // Check if avatar.mv process was successful
+            const imagePath = path.join(__dirname, '..', '/uploads', newFileName);
+            if (!fs.existsSync(imagePath)) {
+                return next(new HttpError("Avatar upload failed", 500));
             }
-        })
+
+            // Update user's avatar in the database
+            const updatedAvatar = await User.findByIdAndUpdate(req.user.id, { avatar: newFileName }, { new: true });
+            if (!updatedAvatar) {
+                return next(new HttpError("Avatar could not be changed", 422));
+            }
+
+            // Send success response
+            res.status(200).json({ message: "Avatar changed successfully", avatar: newFileName });
+        });
     } catch (error) {
-        return next(new HttpError(error))
+        return next(new HttpError(error));
     }
 };
 
